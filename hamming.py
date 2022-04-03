@@ -95,7 +95,14 @@ for i in range(12):
 # Generate table
 import pandas as pd
 import numpy as np
-generator = (firstn(it, 5) for i in range(61))
+# User Input
+frequency_input = input("Enter length of frequency: ")
+range_input = input("Enter number of cycles: ")
+
+# Type Cast into Integer
+frequency_value = int(frequency_input)
+range_value = int(range_input)
+generator = (firstn(it, frequency_value) for i in range(range_value))
 df = pd.DataFrame(generator)
 print (df)
 

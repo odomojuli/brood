@@ -12,10 +12,17 @@ Python code, functional and imperative solutions for scheduling problems
 ---
 ## Why?
 ```
-  “Whatever the Way, the master of strategy does not appear fast…. 
+  Whatever the Way,
+  the master of strategy does not appear fast….
+
   Of course, slowness is bad.
-  Really skillful people never get out of time, and are always deliberate, and never appear busy.”
-  – Miyamoto Musashi (宮本 武蔵, 1584 – 13 June 1645)
+
+  Really skillful people never get out of time,
+  and are always deliberate,
+  and never appear busy.
+
+  Miyamoto Musashi (宮本 武蔵)
+  1584 – 13 June 1645
 ```
 ---
 ## What?
@@ -34,6 +41,9 @@ Currently this repository contains code for:
   * Generator for Hamming Numbers
 * `atkin.py`
   * Sieve of Atkin
+* `multiplication_table.py`
+  * Basic multiplication table
+
 
 An example of using these functions would be assigning `crontab` to distribute jobs that do not overlap with common tasks assigned at common intervals of frequency.
 

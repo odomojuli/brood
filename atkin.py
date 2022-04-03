@@ -27,5 +27,11 @@ def atkin(nmax):
         elif i in [2,3] or is_prime[i]: primes.append(i)
         else: pass
     return primes
-assert(atkin(30)==[2, 3, 5, 7, 11, 13, 17, 19, 23, 29])
-print(atkin(60))
+# Test
+# assert(atkin(number)==[2, 3, 5, 7, 11, 13, 17, 19, 23, 29])
+
+# User Input
+number_input = input("Enter maximum value to compute primes: ")
+#Type Cast Input
+number = int(number_input)
+print(atkin(number))
