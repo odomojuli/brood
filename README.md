@@ -6,12 +6,13 @@ Python code, functional and imperative solutions for scheduling problems
   >(2^i) * (3^j) * (5^k): where i, j, k are non-negative integers.
 * Babylonian Mathematics
     > Sexagesimal numbers such as 60.
+    > > 2 * 2 * 3 * 5 = 60.
 * Hamming Number
     > Introduced by Edsger Dijkstra in 'A Discipline of Programming'.
-    * https://oeis.org/A051037
+    > > https://oeis.org/A051037
 * Poisson process
   > Model behavior of events occurring incrementally and independently.
-  * https://en.wikipedia.org/wiki/Poisson_point_process
+  > > https://en.wikipedia.org/wiki/Poisson_point_process
 ---
 ## Why?
 ```
@@ -24,8 +25,12 @@ Python code, functional and imperative solutions for scheduling problems
   and are always deliberate,
   and never appear busy.
 
-  Miyamoto Musashi (宮本 武蔵)
-  1584 – 13 June 1645
+ – Miyamoto Musashi (宮本 武蔵), 1584 – 13 June 1645
+```
+
+```
+"Being early is being late."
+– My Mom
 ```
 ---
 ## What?
