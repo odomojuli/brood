@@ -5,14 +5,14 @@ Python code, functional and imperative solutions for scheduling problems
 * Number Theory: 5-smooth numbers are numbers with factors of form:
   >(2^i) * (3^j) * (5^k): where i, j, k are non-negative integers.
 * Babylonian Mathematics
-    > Sexagesimal numbers such as 60.
-    > > 2 * 2 * 3 * 5 = 60.
+  > Sexagesimal numbers such as 60.
+  > > 2 * 2 * 3 * 5 = 60.
 * Hamming Number
-    > Introduced by Edsger Dijkstra in 'A Discipline of Programming'.
-    > > https://oeis.org/A051037
+  > Introduced by Edsger Dijkstra in 'A Discipline of Programming'.
+  > > https://oeis.org/A051037
 * Wheel factorization:
   > Generate coprimes from initial sequence of primes.
-  > https://en.wikipedia.org/wiki/Wheel_factorization
+  > > https://en.wikipedia.org/wiki/Wheel_factorization
 * Poisson process
   > Model behavior of events occurring incrementally and independently.
   > > https://en.wikipedia.org/wiki/Poisson_point_process
