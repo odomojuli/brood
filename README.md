@@ -10,6 +10,9 @@ Python code, functional and imperative solutions for scheduling problems
 * Hamming Number
     > Introduced by Edsger Dijkstra in 'A Discipline of Programming'.
     > > https://oeis.org/A051037
+* Wheel factorization:
+  > Generate coprimes from initial sequence of primes.
+  > https://en.wikipedia.org/wiki/Wheel_factorization
 * Poisson process
   > Model behavior of events occurring incrementally and independently.
   > > https://en.wikipedia.org/wiki/Poisson_point_process
