@@ -13,3 +13,7 @@ dist/
 # Local virtual environments
 .venv/
 venv/
+
+# Generated sample data (regenerable from brood.hamming)
+smooth.txt
+smooth.csv

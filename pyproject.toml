@@ -4,10 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "brood"
-version = "0.1.0"
+version = "0.2.0"
 description = "Number-theoretic tools for scheduling on the off-beat -- cicada-inspired desynchronization."
 readme = "README.md"
 requires-python = ">=3.8"
+license = { text = "MIT" }
 authors = [{ name = "odomojuli" }]
 keywords = [
     "primes",
@@ -20,9 +21,12 @@ keywords = [
     "sieve-of-atkin",
 ]
 classifiers = [
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: System :: Networking",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
 ]
 dependencies = []
 
@@ -32,11 +36,18 @@ viz = ["matplotlib>=3.5", "numpy>=1.21"]
 test = ["pytest>=7"]
 http = ["requests>=2.25"]   # for PoliteScraper.get()/crawl(); fetch() needs nothing
 
+[project.urls]
+Homepage = "https://github.com/odomojuli/brood"
+Repository = "https://github.com/odomojuli/brood"
+
 [project.scripts]
 brood = "brood.cli:main"
 
 [tool.setuptools]
 packages = ["brood"]
+
+[tool.setuptools.package-data]
+brood = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

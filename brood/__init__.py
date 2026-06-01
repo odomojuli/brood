@@ -21,6 +21,7 @@ A command-line interface lives in :mod:`brood.cli` (``python -m brood``).
 """
 from __future__ import annotations
 
+from .arrivals import exponential_gaps, human_delays, poisson_process
 from .hamming import first_n_hamming, hamming, hamming_up_to, is_hamming
 from .primes import factorize, is_prime, primes_up_to, sieve_atkin
 from .ratelimit import (
@@ -51,7 +52,7 @@ from .scraper import Disallowed, PoliteScraper
 from .tables import format_table, multiplication_table
 from .wheel import coprimes_up_to, plot_wheel, wheel, wheel_circumference
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     # primes
@@ -94,6 +95,10 @@ __all__ = [
     # scraping
     "PoliteScraper",
     "Disallowed",
+    # arrivals
+    "exponential_gaps",
+    "poisson_process",
+    "human_delays",
     # tables
     "multiplication_table",
     "format_table",

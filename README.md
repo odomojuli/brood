@@ -1,23 +1,34 @@
 # brood
-Python code, functional and imperative solutions for scheduling problems
 
-## Time and Regular Numbers
-* Number Theory: 5-smooth numbers are numbers with factors of form:
-  >(2^i) * (3^j) * (5^k): where i, j, k are non-negative integers.
-* Babylonian Mathematics
-  > Sexagesimal numbers such as 60.
-  > > 2 * 2 * 3 * 5 = 60.
-* Hamming Number
-  > Introduced by Edsger Dijkstra in 'A Discipline of Programming'.
-  > > https://oeis.org/A051037
-* Wheel factorization:
-  > Generate coprimes from initial sequence of primes.
-  > > https://en.wikipedia.org/wiki/Wheel_factorization
-* Poisson process
-  > Model behavior of events occurring incrementally and independently.
-  > > https://en.wikipedia.org/wiki/Poisson_point_process
----
-## Why?
+*Number-theoretic tools for scheduling on the off-beat — desynchronization, from cicadas to cron to scrapers.*
+
+![license](https://img.shields.io/badge/license-MIT-blue.svg)
+![python](https://img.shields.io/badge/python-3.8%2B-blue.svg)
+![tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
+
+Periodical cicadas emerge on **prime** cycles so they rarely share a year with
+predators. `brood` borrows the arithmetic — coprimality, the Chinese Remainder
+Theorem, smooth numbers, equidistribution — to place jobs, requests, and retries
+so they rarely share a *tick*. The result is a small, dependency-free Python
+package (plus optional extras) that runs the same idea from number theory up
+into everyday systems work.
+
+## Contents
+
+- [Why? / What?](#why--what) — the idea, in two epigraphs and a cicada
+- [Install](#install)
+- [The mathematics → computer science map](#the-mathematics--computer-science-map)
+- [Modules](#modules)
+- [Quickstart](#quickstart)
+- [Guides](#guides): [scheduling](#scheduling-find-a-quiet-slot) ·
+  [rate limiting](#pacing-against-an-unknown-rate-limit) ·
+  [polite scraping](#polite-scraping)
+- [Documentation](#documentation)
+- [Whereof?](#whereof)
+- [License](#license)
+
+## Why? / What?
+
 ```
   Whatever the Way,
   the master of strategy does not appear fast….
@@ -35,41 +46,63 @@ Python code, functional and imperative solutions for scheduling problems
 "Being early is being late."
 – My Mom
 ```
----
-## What?
 
-This repository is titled `brood`, inspired by the allochronic speciation exhibited in the emergent behavior of periodical cicada broods.
+This repository is named `brood`, after the allochronic speciation in the
+emergent behaviour of periodical cicada broods. *Magicicada* broods in North
+America emerge in cycles of 13 or 17 years; two broods align only every
+`13 × 17 = 221` years. The **prime-number hypothesis** holds that prime cycles
+rarely overlap with predator cycles — and the same is true of any two periodic
+processes, which is what makes the idea useful far from the forest floor.
 
-*Magicicada* broods in North America emerge periodically in cycles of 13 years or 17 years. Alignment occurs every 221 years, which is 13 * 17 years.
-
-The prime number hypothesis for cicada emergence patterns suggests that predators rarely overlap with the prime numbers, 13 and 17.
-
----
-
-## How?
-
-`brood` is an importable Python package with a command-line interface. The core depends only on the standard library; the clock plot and the test suite are optional extras.
+## Install
 
 ```sh
-pip install -e .            # core (pure standard library)
-pip install -e '.[viz]'     # adds matplotlib + numpy for the wheel clock
-pip install -e '.[test]'    # adds pytest
+git clone https://github.com/odomojuli/brood
+cd brood
+pip install -e .            # core — pure standard library
+pip install -e '.[viz]'     # + matplotlib/numpy for the wheel clock
+pip install -e '.[http]'    # + requests for PoliteScraper.get()/crawl()
+pip install -e '.[test]'    # + pytest
 ```
 
-### The package
+Requires Python 3.8+. The core imports nothing outside the standard library.
+
+## The mathematics → computer science map
+
+`brood` is one idea — *desynchronization by number theory* — implemented
+several ways. Each module turns a piece of mathematics into an answer to a
+systems problem:
+
+| Mathematics | Computer-science problem | Module |
+| --- | --- | --- |
+| 5-smooth (Hamming) numbers & their complement | avoid the "round-interval" pile-up | `hamming`, `wheel` |
+| Coprimality & the Chinese Remainder Theorem | when two cadences collide, and how rarely | `schedule` |
+| Euler's totient & wheel factorization | enumerate the non-colliding offsets | `wheel` |
+| Equidistribution / three-distance theorem | phase coverage, jitter spreading | `ratelimit` |
+| Prime gaps & the prime-period hypothesis | maximise time between coincidences | `primes` |
+| Cyclic groups `(Z/pZ)*` | clean residue mixing under a prime modulus | `tables` |
+| Poisson processes | memoryless / human-like arrival timing | `arrivals` |
+
+The full derivation — with a diagram and the precise statements — is in
+**[docs/mathematics.md](docs/mathematics.md)**.
+
+## Modules
 
 | Module | What it does |
 | --- | --- |
 | `brood.primes` | Sieve of Atkin prime generator (Atkin & Bernstein, 2004), a single-number `is_prime`, and `factorize`. |
 | `brood.hamming` | Lazy Dijkstra generator for Hamming / 5-smooth numbers (OEIS A051037), plus an `is_hamming` test. |
 | `brood.wheel` | Wheel factorization: the residues coprime to a prime basis — the slots that never collide — plus a clock visualization. |
-| `brood.schedule` | Collision-avoidance scheduler: place a job near a target cadence so it avoids — or maximally rarefies — coincidences with existing jobs, with exact CRT coincidence analysis. |
-| `brood.ratelimit` | Rate-limit-safe pacing for an *unknown* limit: gaps coprime to a set of assumed windows, plus the analysis tools to see what that does ([docs/rate-limiting.md](docs/rate-limiting.md)). |
-| `brood.scraper` | `PoliteScraper`: per-host paced, robots-aware, `Retry-After`-respecting HTTP for scrapers, built on the pacer ([docs/scraping.md](docs/scraping.md)). |
-| `brood.tables` | Multiplication tables for checking that a prime modulus generates a cyclic (abelian) group. |
-| `poisson.ipynb` | Notebook: approximate human-delay responses sampled from a Poisson process. |
+| `brood.schedule` | Collision-avoidance scheduler: place a job near a target cadence so it avoids — or maximally rarefies — coincidences, with exact CRT analysis. |
+| `brood.ratelimit` | Rate-limit-safe pacing for an *unknown* limit, the `Pacer` helper, and the analysis tools ([docs/rate-limiting.md](docs/rate-limiting.md)). |
+| `brood.scraper` | `PoliteScraper`: per-host paced, robots-aware, `Retry-After`-respecting HTTP for scrapers ([docs/scraping.md](docs/scraping.md)). |
+| `brood.arrivals` | Poisson process, exponential gaps, and human-like delays (`~274 ms` reaction time). |
+| `brood.tables` | Multiplication tables for checking that a prime modulus generates a cyclic group. |
 
-Everything is importable and covered by `pytest` (see `tests/`).
+Everything is importable, typed (`py.typed`), and covered by `pytest` (see
+`tests/`). An exploratory Poisson notebook lives in `examples/`.
+
+## Quickstart
 
 ```python
 from brood import sieve_atkin, factorize, hamming_up_to, wheel, coprimes_up_to
@@ -81,38 +114,32 @@ wheel((2, 3, 5))       # [1, 7, 11, 13, 17, 19, 23, 29]  -- non-colliding offset
 coprimes_up_to(60)     # every collision-free slot up to 60
 ```
 
-### The CLI
-
 ```sh
 brood primes 30            # 2 3 5 7 11 13 17 19 23 29
 brood factor 221           # 221 = 13 * 17   (the cicada brood alignment)
 brood hamming 10           # first 10: 1 2 3 4 5 6 8 9 10 12
 brood wheel                # spokes coprime to {2,3,5}: 1 7 11 13 17 19 23 29
-brood wheel --up-to 60     # all collision-free slots up to 60
 brood wheel --plot         # draw the wheel as a clock   (needs the viz extra)
 brood table 6 --mod 7      # multiplication table mod 7
 brood coincide 13 5        # first at tick 0, then every 65
 brood schedule --every '~13' --avoid 5,15,30   # find a collision-free slot
+brood pace --windows 1000,250,200              # safe jitter for an unknown limit
+brood scrape https://example.com               # fetch politely (needs brood[http])
 ```
 
 Equivalently, `python -m brood ...`.
 
-### Why this helps scheduling
-
-Suppose you want a `crontab` job that does **not** overlap with the tasks everyone assigns on the hour during peak traffic.
-
-The "round" intervals — 60 s, 3600 s, 86400 s — are Hamming numbers: products of 2, 3 and 5. So schedule on the *complement*, a slot whose period has a prime factor greater than 5 (OEIS A279622), which is exactly what `brood wheel` enumerates:
-
-* https://oeis.org/A279622
-  > Numbers with a prime factor greater than 5
-
-Furthermore, by definition of a prime period, two cycles share a slot only at the least common multiple of their lengths — so coprime periods collide as rarely as a 13-year brood meets a 17-year one: once every 221 turns.
+## Guides
 
 ### Scheduling: find a quiet slot
 
-`brood.schedule` turns that idea into a tool. Model each existing job as a *cadence* — period `p`, phase `f`, firing at every tick `t` with `t % p == f` — then ask for a slot near a target cadence that collides as little as possible. The recommender works two levers and reports the exact, horizon-free coincidence analysis via the Chinese Remainder Theorem.
+`brood.schedule` models each existing job as a *cadence* — period `p`, phase
+`f`, firing at every tick `t` with `t % p == f` — then finds a slot near a
+target cadence that collides as little as possible, working two levers and
+reporting the exact, horizon-free coincidence analysis via the CRT.
 
-**Lever 1 — phase.** When the new period shares a factor with the existing ones, you can often drop the job into the gap and *never* collide. Ask for "about 13" against the every-5 family and it picks a multiple of 5, offset into the empty space:
+**Lever 1 — phase.** When the new period shares a factor with the existing ones,
+you can often drop the job into the gap and *never* collide:
 
 ```text
 $ brood schedule --every '~13' --avoid 5,15,30
@@ -126,7 +153,9 @@ $ brood schedule --every '~13' --avoid 5,15,30
   -> collision-free: this slot never meets any listed job.
 ```
 
-**Lever 2 — coprime drift (the cicada move).** Pin the period to 13 and it can no longer share a factor, so a coincidence is inevitable — but maximally rare, and pushed out of the busy window by choice of phase:
+**Lever 2 — coprime drift (the cicada move).** Pin the period to 13 and a
+coincidence becomes inevitable — but maximally rare, and pushed out of the busy
+window by choice of phase:
 
 ```text
 $ brood schedule --every 13 --avoid 5,15,30 --horizon 60
@@ -135,12 +164,8 @@ $ brood schedule --every 13 --avoid 5,15,30 --horizon 60
   fires at: 8, 21, 34, 47
   collisions within horizon: 0
     vs every 5,  phase 0 : first at 60, then every 65   (coprime)
-    vs every 15, phase 0 : first at 60, then every 195  (coprime)
-    vs every 30, phase 0 : first at 60, then every 390  (coprime)
   -> soonest coincidence: tick 60; rarest guaranteed gap: 65 ticks.
 ```
-
-From Python:
 
 ```python
 from brood import schedule, coincidence, Cadence
@@ -154,19 +179,28 @@ Units are abstract ticks — minutes, seconds, frames, whatever your timeline co
 
 ### Pacing against an unknown rate limit
 
-`brood.ratelimit` applies the same idea to rate limiting. If you don't know the limit but can guess a few common windows — say 1000 / 250 / 200 ms — it paces requests with gaps coprime to all of them (those windows are 2·5-smooth, so the safe set is the wheel(2, 5) spokes). A full, honestly-troubleshooted treatment — including where the desync trick *doesn't* help (single-stream burst size is governed by your rate, not your gaps) and where it does (phase coverage, and keeping clients from re-synchronizing) — is in **[docs/rate-limiting.md](docs/rate-limiting.md)**.
+`brood.ratelimit` applies the idea to rate limiting: if you can only guess a few
+common windows (say 1000 / 250 / 200 ms), it paces requests with gaps coprime to
+all of them. The writeup is honest about where the trick helps and where it
+doesn't — single-stream burst size is set by your *rate*, not your gaps; the wins
+are phase coverage and keeping clients from re-synchronizing. See
+**[docs/rate-limiting.md](docs/rate-limiting.md)**.
 
 ```sh
 brood pace --windows 1000,250,200          # a safe jitter sample
 brood pace --windows 1000,250,200 --n 8    # a precomputed schedule
-brood pace --windows 1000,250,200 --fixed 220   # one fixed coprime interval
 ```
 
-For a real client, `brood.ratelimit.Pacer` wires the recommendation into a drop-in `run()` wrapper — your chosen rate, a phase-jittered start, coprime gaps between calls, and full-jitter backoff on 429s.
+For a real client, `brood.ratelimit.Pacer` wires the recommendation into a
+drop-in `run()` — your chosen rate, a phase-jittered start, coprime gaps, and
+full-jitter backoff on 429s.
 
 ### Polite scraping
 
-`brood.scraper.PoliteScraper` makes "be nice to their server" a one-liner: per-host paced, jittered requests that respect `Retry-After`, back off on 429/503, and obey `robots.txt` (`Crawl-delay` included). Full guide in **[docs/scraping.md](docs/scraping.md)**.
+`brood.scraper.PoliteScraper` makes "be nice to their server" a one-liner:
+per-host paced, jittered requests that respect `Retry-After`, back off on
+429/503, and obey `robots.txt` (`Crawl-delay` included). Full guide in
+**[docs/scraping.md](docs/scraping.md)**.
 
 ```python
 from brood import PoliteScraper
@@ -179,9 +213,22 @@ for url, resp in scraper.crawl(urls):        # paced, robots-aware, skips Disall
 
 Or bring your own client (zero extra deps): `scraper.fetch(lambda: httpx.get(url), url)`.
 
----
+## Documentation
+
+- **[docs/mathematics.md](docs/mathematics.md)** — the number-theory → CS spine.
+- **[docs/rate-limiting.md](docs/rate-limiting.md)** — formalize, apply, and
+  *troubleshoot* the desync-for-rate-limits idea, with simulations.
+- **[docs/scraping.md](docs/scraping.md)** — the polite-scraper guide.
+- **[docs/literature.md](docs/literature.md)** — annotated bibliography:
+  cicada biology, coprime scheduling, equidistribution, and desync.
+
 ## Whereof?
 
-Hacker folklore prescribes randomizing or selecting a prime number to assign tasks to avoid overlap.
+Hacker folklore prescribes randomizing or selecting a prime number to assign
+tasks and avoid overlap. The motivation of this repository is to refine that
+perspective into a formalization of a number-theoretic approach to the job
+scheduling problem — and to follow it, honestly, wherever it leads.
 
-The motivation of this repository is to refine that perspective into a formalization of a number theoretic approach to the job scheduling problem.
+## License
+
+[MIT](LICENSE) © odomojuli
