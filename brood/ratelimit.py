@@ -41,6 +41,8 @@ __all__ = [
     "safe_gaps",
     "is_safe_gap",
     "jitter",
+    "golden_sequence",
+    "golden_jitter",
     "fixed_interval",
     "schedule_n",
     "phase_histogram",
@@ -113,6 +115,57 @@ def jitter(
     rng = random.Random(seed)
     while True:
         yield rng.choice(pool)
+
+
+# --------------------------------------------------------------------------- #
+# Low-discrepancy (golden-ratio) pacing
+# --------------------------------------------------------------------------- #
+GOLDEN = (5 ** 0.5 - 1) / 2  # 1/phi ~= 0.618; the "most irrational" step
+
+
+def golden_sequence(n: int, start: float = 0.0) -> List[float]:
+    """The additive golden-ratio low-discrepancy sequence in ``[0, 1)``.
+
+    ``x_k = (start + k / phi) mod 1`` fills the interval more evenly than random
+    (the three-distance theorem bounds its gaps to two lengths in golden ratio).
+
+    >>> [round(x, 3) for x in golden_sequence(5)]
+    [0.0, 0.618, 0.236, 0.854, 0.472]
+    """
+    if n < 0:
+        raise ValueError("n must be non-negative")
+    return [(start + k * GOLDEN) % 1.0 for k in range(n)]
+
+
+def golden_jitter(
+    windows: Sequence[int],
+    lo: int,
+    hi: int,
+    *,
+    start: Optional[float] = None,
+    seed: Optional[int] = None,
+) -> Iterator[int]:
+    """Like :func:`jitter`, but walks the golden sequence through the safe pool.
+
+    The gaps are still coprime-safe and still look unpredictable, but the
+    arrival phases spread more uniformly across every candidate window than
+    uniform random jitter -- measurably so (``docs/rate-limiting.md``, the
+    low-discrepancy finding). Pass a random ``start`` (or ``seed``) so many
+    clients do not share one sequence.
+
+    >>> from itertools import islice
+    >>> list(islice(golden_jitter([1000, 250, 200], 210, 222), 5))
+    [211, 219, 213, 221, 217]
+    """
+    pool = safe_gaps(windows, lo, hi)
+    if not pool:
+        raise ValueError("no gaps in [lo, hi] are coprime to all windows")
+    if start is None:
+        start = random.Random(seed).random() if seed is not None else 0.0
+    x = start % 1.0
+    while True:
+        yield pool[int(x * len(pool)) % len(pool)]
+        x = (x + GOLDEN) % 1.0
 
 
 # --------------------------------------------------------------------------- #
@@ -290,12 +343,14 @@ class Pacer:
     max_backoff: int = 10_000      # ms, the backoff ceiling
     jitter_start: bool = True
     seed: Optional[int] = None
+    low_discrepancy: bool = False  # golden-ratio gaps instead of uniform jitter
 
     def __post_init__(self) -> None:
         self._pool = safe_gaps(self.windows, self.lo, self.hi)
         if not self._pool:
             raise ValueError("no gaps in [lo, hi] are coprime to all windows")
         self._rng = random.Random(self.seed)
+        self._golden_x = self._rng.random()
         self._max_window = max(self.windows)
         self._started = False
 
@@ -305,7 +360,15 @@ class Pacer:
         return self._rng.randrange(self._max_window)
 
     def next_gap(self) -> int:
-        """The next coprime-safe inter-request gap."""
+        """The next coprime-safe inter-request gap.
+
+        Golden-ratio (low-discrepancy) selection when ``low_discrepancy`` is
+        set, otherwise uniform random.
+        """
+        if self.low_discrepancy:
+            gap = self._pool[int(self._golden_x * len(self._pool)) % len(self._pool)]
+            self._golden_x = (self._golden_x + GOLDEN) % 1.0
+            return gap
         return self._rng.choice(self._pool)
 
     def plan(self, n: int, start: int = 0) -> List[int]:

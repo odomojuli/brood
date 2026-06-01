@@ -97,6 +97,8 @@ def build_parser() -> argparse.ArgumentParser:
                          help="display window in ticks (default: one coincidence cycle)")
     p_sched.add_argument("--search", type=int, default=6,
                          help="how far to search around ~target (default: 6)")
+    p_sched.add_argument("--align", action="store_true",
+                         help="harmonic dial: lock step with the jobs instead of avoiding")
 
     p_coin = sub.add_parser("coincide", help="when do two cadences collide?")
     p_coin.add_argument("a", help="cadence PERIOD[:PHASE]")
@@ -167,7 +169,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     elif args.command == "schedule":
         rec = schedule(args.every, avoid=_parse_avoid(args.avoid),
-                       horizon=args.horizon, search=args.search)
+                       horizon=args.horizon, search=args.search, align=args.align)
         print(rec.explain())
 
     elif args.command == "coincide":

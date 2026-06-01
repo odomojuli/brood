@@ -96,6 +96,8 @@ where the tension is sharpest.
   opposite of `brood`: schedulability theory courts the resonance that
   collision-avoidance flees. The right choice depends entirely on whether
   coincidence is the goal (predictability) or the hazard (contention).
+  **→** now a dial in `brood.schedule`: `find_slot(..., align=True)` snaps to the
+  harmonic side, `align=False` (the default) to the coprime side.
 
 ## 6. Smooth numbers
 
@@ -172,15 +174,18 @@ where the tension is sharpest.
 
 ## Threads worth pulling
 
-- **Low-discrepancy pacing.** Replace uniform jitter in `brood.ratelimit` with a
-  golden-ratio / van der Corput schedule and measure phase coverage (§4).
+- **Low-discrepancy pacing — now in `brood.ratelimit`** (`golden_jitter`, §4):
+  a golden-ratio schedule, modestly flatter than random jitter in a wide band —
+  but it *resonates* when the band sits at the window size (rate-limiting.md
+  Finding 5). Open: van der Corput / Halton variants.
 - **Adaptive desync — now in `brood.swarm`** (§8): independent clients
   coordinate phases through a shared medium at runtime, not just by
   construction. Open refinement: a smoother AIMD for the quorum
   circuit-breaker instead of the current step.
-- **The harmonic/coprime dial.** Expose a single knob spanning §5's two
-  regimes — harmonic for predictability, coprime for contention-avoidance —
-  and let the use case choose.
+- **The harmonic/coprime dial — now in `brood.schedule`** (§5):
+  `find_slot(..., align=True)` snaps to harmonic (predictable, frequent
+  coincidence), `align=False` to coprime (contention-avoidance). Open: extend
+  the dial to `brood.ratelimit` window selection.
 
 *Citations were gathered and checked via web search in June 2026; follow the
 links for the authoritative versions.*

@@ -9,6 +9,8 @@ from brood.ratelimit import (
     Pacer,
     conservative_gap,
     fixed_interval,
+    golden_jitter,
+    golden_sequence,
     is_safe_gap,
     jitter,
     max_fixed_bucket,
@@ -62,6 +64,68 @@ def test_jitter_reproducible_and_safe():
 def test_jitter_empty_pool_raises():
     with pytest.raises(ValueError):
         next(jitter([2], 4, 4))  # nothing in [4, 4] is coprime to 2
+
+
+# --------------------------------------------------------------------------- #
+# Low-discrepancy (golden) pacing
+# --------------------------------------------------------------------------- #
+def test_golden_sequence_known_values():
+    assert [round(x, 3) for x in golden_sequence(5)] == \
+        [0.0, 0.618, 0.236, 0.854, 0.472]
+
+
+def test_golden_sequence_beats_random_discrepancy():
+    import random as _random
+
+    def max_gap(points):
+        pts = sorted(points)
+        gaps = [b - a for a, b in zip(pts, pts[1:])] + [pts[0] + 1.0 - pts[-1]]
+        return max(gaps)
+
+    golden = max_gap(golden_sequence(200))
+    rand = max_gap([_random.Random(0).random() for _ in range(200)])
+    assert golden < rand          # low-discrepancy: no big empty stretches
+
+
+def test_golden_jitter_safe_and_reproducible():
+    a = list(islice(golden_jitter(WINDOWS, 200, 240), 30))
+    b = list(islice(golden_jitter(WINDOWS, 200, 240), 30))
+    assert a == b
+    assert all(is_safe_gap(g, WINDOWS) for g in a)
+
+
+def test_golden_jitter_random_start_decorrelates():
+    a = list(islice(golden_jitter(WINDOWS, 200, 240, seed=1), 30))
+    b = list(islice(golden_jitter(WINDOWS, 200, 240, seed=2), 30))
+    assert a != b                 # different starts -> different fleets
+
+
+def test_golden_beats_uniform_in_a_wide_band():
+    import random as _random
+
+    def cumulative(gaps):
+        t, out = 0, []
+        for g in gaps:
+            out.append(t)
+            t += g
+        return out
+
+    n = 4000
+    pool = safe_gaps(WINDOWS, 200, 240)
+    rng = _random.Random(0)
+    uniform = cumulative([rng.choice(pool) for _ in range(n)])
+    golden = cumulative(list(islice(golden_jitter(WINDOWS, 200, 240), n)))
+    # the conditional finding: in a wide band golden is at least as flat
+    assert phase_uniformity(golden, 200) < phase_uniformity(uniform, 200)
+
+
+def test_pacer_low_discrepancy_gaps_are_safe_and_reproducible():
+    p = Pacer(WINDOWS, 200, 240, seed=0, low_discrepancy=True)
+    plan = p.plan(20)
+    gaps = [b - a for a, b in zip(plan, plan[1:])]
+    assert all(is_safe_gap(g, WINDOWS) for g in gaps)
+    assert (Pacer(WINDOWS, 200, 240, seed=0, low_discrepancy=True).plan(10)
+            == Pacer(WINDOWS, 200, 240, seed=0, low_discrepancy=True).plan(10))
 
 
 def test_fixed_interval_nearest_and_coprime():

@@ -188,6 +188,7 @@ class Recommendation:
     rarest_recurrence: Optional[int]
     min_gap: float
     per_job: List[Tuple[Cadence, Optional[Coincidence]]] = field(default_factory=list)
+    align: bool = False
 
     @property
     def collision_count(self) -> int:
@@ -227,11 +228,16 @@ class Recommendation:
                 note = f"first at {co.first}, then every {co.every}  ({kind})"
             lines.append(f"    vs {str(job):<22}: {note}")
 
-        if self.collision_free:
-            lines.append("")
+        lines.append("")
+        if self.align:
+            if self.collision_free:
+                lines.append("  -> could not align with any listed job near the target.")
+            else:
+                lines.append(f"  -> aligned: locks step with the listed jobs, "
+                             f"coinciding every {self.rarest_recurrence} ticks.")
+        elif self.collision_free:
             lines.append("  -> collision-free: this slot never meets any listed job.")
         else:
-            lines.append("")
             lines.append(f"  -> soonest coincidence: tick {self.soonest_coincidence}; "
                          f"rarest guaranteed gap: {self.rarest_recurrence} ticks.")
         return "\n".join(lines)
@@ -266,16 +272,28 @@ def _evaluate(cad: Cadence, jobs: Sequence[Cadence], horizon: int) -> Recommenda
     )
 
 
-def _score(rec: Recommendation, target: int) -> tuple:
+def _score(rec: Recommendation, target: int, align: bool = False) -> tuple:
     """Sort key, ascending = better.
 
-    Priorities: (1) meet the fewest jobs, (2) stay near the requested period,
-    (3) push coincidences as rare and as late as possible, (4) sit in the
-    roomiest gap, then deterministic tie-breaks.
+    ``align=False`` (avoid): meet the fewest jobs, stay near the target, then
+    push coincidences as rare and as late as possible and sit in the roomiest
+    gap. ``align=True`` (harmonic): the mirror image -- meet as *many* jobs as
+    possible, as *frequently* (small lcm) and as *soon* as possible.
     """
     meets = sum(1 for _, co in rec.per_job if co is not None)
     rarity = rec.rarest_recurrence if rec.rarest_recurrence is not None else _INF
     soonest = rec.soonest_coincidence if rec.soonest_coincidence is not None else _INF
+    if align:
+        # alignment quality = fraction of this job's firings that land on an
+        # existing mark; then nearest to target, then most frequent (small lcm).
+        quality = len(rec.collisions) / len(rec.firings) if rec.firings else 0.0
+        return (
+            -quality,
+            abs(rec.cadence.period - target),
+            rarity,
+            rec.cadence.period,
+            rec.cadence.phase,
+        )
     return (
         meets,
         abs(rec.cadence.period - target),
@@ -304,11 +322,18 @@ def find_slot(
     approx: Optional[int] = None,
     horizon: Optional[int] = None,
     search: int = 6,
+    align: bool = False,
 ) -> Recommendation:
-    """Find the quietest cadence near a target, avoiding the ``avoid`` jobs.
+    """Find a cadence near a target relative to the ``avoid`` jobs.
 
     Provide exactly one of ``period`` (use this exact period, search only the
     phase) or ``approx`` (search nearby periods too, ``+/- search``).
+
+    ``align=False`` (default) finds the *quietest* slot -- it avoids or
+    maximally rarefies coincidences. ``align=True`` flips the dial to
+    *harmonic*: it locks step with the existing jobs, coinciding as cleanly and
+    as frequently as possible (small hyperperiod) -- for when you *want* tasks
+    to line up. See docs/mathematics.md §2 and docs/literature.md §5.
     """
     if (period is None) == (approx is None):
         raise ValueError("pass exactly one of period= or approx=")
@@ -329,12 +354,13 @@ def find_slot(
     for p in candidate_periods:
         for phase in range(p):
             rec = _evaluate(Cadence(p, phase), jobs, window)
-            key = _score(rec, target)
+            key = _score(rec, target, align)
             if best_key is None or key < best_key:
                 best_key, best = key, rec
     assert best is not None  # candidate_periods is non-empty
     # Record the original target (so a phase-only search still reports ~target).
     best.target = target
+    best.align = align
     return best
 
 
@@ -343,15 +369,19 @@ def schedule(
     avoid: Iterable[CadenceLike] = (),
     horizon: Optional[int] = None,
     search: int = 6,
+    align: bool = False,
 ) -> Recommendation:
     """Friendly wrapper around :func:`find_slot`.
 
     ``every`` may be an int (an exact period), a string like ``"13"`` (exact),
-    or ``"~13"`` (approximate -- search nearby periods).
+    or ``"~13"`` (approximate -- search nearby periods). ``align`` is the
+    harmonic/coprime dial: ``False`` avoids the existing jobs, ``True`` locks
+    step with them.
 
-    >>> rec = schedule("~13", avoid=[5, 15, 30])
-    >>> rec.collision_free          # a period sharing 5 can dodge them all
+    >>> schedule("~13", avoid=[5, 15, 30]).collision_free          # avoid: dodge them
     True
+    >>> str(schedule("~13", avoid=[5, 15, 30], align=True).cadence)  # harmonic: line up
+    'every 15, phase 0'
     """
     approx = False
     if isinstance(every, str):
@@ -363,5 +393,7 @@ def schedule(
         value = int(every)
 
     if approx:
-        return find_slot(avoid, approx=value, horizon=horizon, search=search)
-    return find_slot(avoid, period=value, horizon=horizon, search=search)
+        return find_slot(avoid, approx=value, horizon=horizon,
+                         search=search, align=align)
+    return find_slot(avoid, period=value, horizon=horizon,
+                     search=search, align=align)

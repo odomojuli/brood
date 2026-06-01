@@ -10,6 +10,7 @@ from __future__ import annotations
 import random
 
 from brood.ratelimit import (
+    golden_jitter,
     max_fixed_bucket,
     max_sliding,
     phase_histogram,
@@ -97,6 +98,33 @@ def experiment_recollision(horizon=50_000):
     return counts
 
 
+def experiment_golden():
+    """Golden (low-discrepancy) vs uniform jitter -- helps only with a wide band."""
+    import random as _random
+
+    def cumulative(gaps):
+        t, out = 0, []
+        for g in gaps:
+            out.append(t)
+            t += g
+        return out
+
+    print("\n== Experiment 4: golden vs uniform jitter "
+          "(phase peak/mean @ 200 ms, lower is flatter) ==")
+    print(f"{'gap range':18} | {'uniform':>8} | {'golden':>8}")
+    print("-" * 42)
+    n = 4000
+    for lo, hi, label in [(200, 240, "wide [200,240]"),
+                          (196, 204, "narrow @window")]:
+        pool = safe_gaps(WINDOWS, lo, hi)
+        rng = _random.Random(0)
+        uniform = cumulative([rng.choice(pool) for _ in range(n)])
+        gold = golden_jitter(WINDOWS, lo, hi)
+        golden = cumulative([next(gold) for _ in range(n)])
+        print(f"{label:18} | {phase_uniformity(uniform, 200):>8.2f} | "
+              f"{phase_uniformity(golden, 200):>8.2f}")
+
+
 def make_chart(streams, herd_peaks, recollide, path="docs/rate-limiting.png"):
     import matplotlib
     matplotlib.use("Agg")
@@ -147,4 +175,5 @@ if __name__ == "__main__":
     streams = experiment_single_stream()
     peaks = experiment_herd()
     recollide = experiment_recollision()
+    experiment_golden()
     make_chart(streams, peaks, recollide)

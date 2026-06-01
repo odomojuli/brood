@@ -176,6 +176,8 @@ coincidence(Cadence(13), Cadence(5))                # Coincidence(first=0, every
 coincidence(Cadence(4), Cadence(6, 3))              # None — even vs odd ticks, never meet
 ```
 
+The same call has a **harmonic/coprime dial**: `schedule("~13", avoid=[5,15,30], align=True)` flips it to *lock step* with the existing jobs (every 15, phase 0) instead of dodging them — the two regimes of [docs/literature.md §5](docs/literature.md).
+
 Units are abstract ticks — minutes, seconds, frames, whatever your timeline counts.
 
 ### Pacing against an unknown rate limit

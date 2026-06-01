@@ -118,7 +118,9 @@ matters for sliding-window limiters and for probing. See
 qualified, version.
 
 > Module: [`brood.ratelimit`](../brood/ratelimit.py) — `phase_histogram`,
-> `phase_uniformity`, and the coprime `safe_gaps`.
+> `phase_uniformity`, the coprime `safe_gaps`, and `golden_jitter`, a
+> low-discrepancy (golden-ratio) pacer that fills phases more evenly still —
+> modestly, and only with room (rate-limiting.md, Finding 5).
 
 ## 5. Prime gaps and the prime-period hypothesis — why primes
 

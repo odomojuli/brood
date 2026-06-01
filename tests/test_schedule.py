@@ -134,3 +134,29 @@ def test_explain_is_stringy():
     text = schedule("~13", avoid=[5, 15, 30]).explain()
     assert "Recommendation" in text
     assert "coincidence analysis" in text
+
+
+# --------------------------------------------------------------------------- #
+# The harmonic/coprime dial
+# --------------------------------------------------------------------------- #
+def test_align_locks_step():
+    rec = schedule("~13", avoid=[5, 15, 30], align=True)
+    assert rec.align is True
+    assert not rec.collision_free
+    assert rec.cadence.period % 5 == 0          # shares the dominant factor
+    assert rec.cadence.phase == 0               # lands on the marks
+    assert rec.collision_count == len(rec.firings)   # every firing aligns
+
+
+def test_dial_is_the_phase():
+    # Same period either way near ~13 against the every-5 family; the dial just
+    # flips the phase: avoid dodges into the gap, align lands on the marks.
+    avoid = schedule("~13", avoid=[5, 15, 30])
+    align = schedule("~13", avoid=[5, 15, 30], align=True)
+    assert avoid.cadence.period == align.cadence.period == 15
+    assert avoid.collision_free and not align.collision_free
+
+
+def test_align_explain_mentions_lock_step():
+    text = schedule("~13", avoid=[5, 15, 30], align=True).explain()
+    assert "aligned" in text and "locks step" in text

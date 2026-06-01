@@ -137,7 +137,28 @@ only at multiples of their lcm — twice in the window (right panel, log scale).
 This is the cicada result, and it is about *re-collision over time*, not about a
 single stream versus a single window.
 
-## 7. Recommendation
+## 7. Finding 5 — low-discrepancy (golden) pacing helps, with room to breathe
+
+Random jitter clumps; a *low-discrepancy* sequence fills an interval more evenly
+(the three-distance theorem bounds the golden sequence's gaps to two lengths in
+golden ratio). `brood.ratelimit.golden_jitter` walks that sequence through the
+safe pool instead of choosing uniformly at random. Experiment 4 (phase peak/mean
+at the 200 ms window, lower = flatter):
+
+| gap range        | uniform | golden |
+| ---------------- | ------- | ------ |
+| wide [200, 240]  | 1.07    | 1.04   |
+| narrow @ window  | 2.95    | 9.84   |
+
+The honest reading: with a **wide** band golden is modestly flatter than random,
+and being deterministic it never clumps by luck. But it is *not* a free win — in
+a **narrow** band whose gaps sit right at the window size, golden's regularity
+*resonates* and is far worse than random (9.84 vs 2.95). The dominant lever is
+still the **gap range**, as Finding 2 warned; golden just makes a well-ranged
+jitter a little better and a badly-ranged one a little worse. Use it with a band
+wide relative to the windows you care about — `Pacer(..., low_discrepancy=True)`.
+
+## 8. Recommendation
 
 For the unknown-limit problem, in priority order:
 
@@ -159,7 +180,7 @@ trip the limit. `brood.ratelimit` gives you all three output forms (a seedable
 jitter stream, a fixed coprime interval, and a precomputed schedule) so you can
 combine rate, jitter, and coprime gaps as above.
 
-## 8. Ready-to-use: the `Pacer`
+## 9. Ready-to-use: the `Pacer`
 
 `brood.ratelimit.Pacer` wires the four pieces together so you don't have to
 re-derive them at each call site: the **rate** you choose (a gap band, sized
