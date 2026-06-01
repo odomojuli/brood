@@ -23,6 +23,16 @@ from __future__ import annotations
 
 from .hamming import first_n_hamming, hamming, hamming_up_to, is_hamming
 from .primes import factorize, is_prime, primes_up_to, sieve_atkin
+from .schedule import (
+    Cadence,
+    Coincidence,
+    Recommendation,
+    busy_ticks,
+    coincidence,
+    collisions,
+    find_slot,
+    schedule,
+)
 from .tables import format_table, multiplication_table
 from .wheel import coprimes_up_to, plot_wheel, wheel, wheel_circumference
 
@@ -44,6 +54,15 @@ __all__ = [
     "wheel_circumference",
     "coprimes_up_to",
     "plot_wheel",
+    # scheduling
+    "Cadence",
+    "Coincidence",
+    "coincidence",
+    "collisions",
+    "busy_ticks",
+    "Recommendation",
+    "find_slot",
+    "schedule",
     # tables
     "multiplication_table",
     "format_table",

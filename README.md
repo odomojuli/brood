@@ -63,6 +63,7 @@ pip install -e '.[test]'    # adds pytest
 | `brood.primes` | Sieve of Atkin prime generator (Atkin & Bernstein, 2004), a single-number `is_prime`, and `factorize`. |
 | `brood.hamming` | Lazy Dijkstra generator for Hamming / 5-smooth numbers (OEIS A051037), plus an `is_hamming` test. |
 | `brood.wheel` | Wheel factorization: the residues coprime to a prime basis — the slots that never collide — plus a clock visualization. |
+| `brood.schedule` | Collision-avoidance scheduler: place a job near a target cadence so it avoids — or maximally rarefies — coincidences with existing jobs, with exact CRT coincidence analysis. |
 | `brood.tables` | Multiplication tables for checking that a prime modulus generates a cyclic (abelian) group. |
 | `poisson.ipynb` | Notebook: approximate human-delay responses sampled from a Poisson process. |
 
@@ -88,6 +89,8 @@ brood wheel                # spokes coprime to {2,3,5}: 1 7 11 13 17 19 23 29
 brood wheel --up-to 60     # all collision-free slots up to 60
 brood wheel --plot         # draw the wheel as a clock   (needs the viz extra)
 brood table 6 --mod 7      # multiplication table mod 7
+brood coincide 13 5        # first at tick 0, then every 65
+brood schedule --every '~13' --avoid 5,15,30   # find a collision-free slot
 ```
 
 Equivalently, `python -m brood ...`.
@@ -102,6 +105,50 @@ The "round" intervals — 60 s, 3600 s, 86400 s — are Hamming numbers: product
   > Numbers with a prime factor greater than 5
 
 Furthermore, by definition of a prime period, two cycles share a slot only at the least common multiple of their lengths — so coprime periods collide as rarely as a 13-year brood meets a 17-year one: once every 221 turns.
+
+### Scheduling: find a quiet slot
+
+`brood.schedule` turns that idea into a tool. Model each existing job as a *cadence* — period `p`, phase `f`, firing at every tick `t` with `t % p == f` — then ask for a slot near a target cadence that collides as little as possible. The recommender works two levers and reports the exact, horizon-free coincidence analysis via the Chinese Remainder Theorem.
+
+**Lever 1 — phase.** When the new period shares a factor with the existing ones, you can often drop the job into the gap and *never* collide. Ask for "about 13" against the every-5 family and it picks a multiple of 5, offset into the empty space:
+
+```text
+$ brood schedule --every '~13' --avoid 5,15,30
+
+  new job : every 15, phase 2
+  fires at: 2, 17, 32, 47, 62, ...
+  collisions within horizon: 0
+    vs every 5,  phase 0 : never  (shares a factor; phase-dodged)
+    vs every 15, phase 0 : never  (shares a factor; phase-dodged)
+    vs every 30, phase 0 : never  (shares a factor; phase-dodged)
+  -> collision-free: this slot never meets any listed job.
+```
+
+**Lever 2 — coprime drift (the cicada move).** Pin the period to 13 and it can no longer share a factor, so a coincidence is inevitable — but maximally rare, and pushed out of the busy window by choice of phase:
+
+```text
+$ brood schedule --every 13 --avoid 5,15,30 --horizon 60
+
+  new job : every 13, phase 8
+  fires at: 8, 21, 34, 47
+  collisions within horizon: 0
+    vs every 5,  phase 0 : first at 60, then every 65   (coprime)
+    vs every 15, phase 0 : first at 60, then every 195  (coprime)
+    vs every 30, phase 0 : first at 60, then every 390  (coprime)
+  -> soonest coincidence: tick 60; rarest guaranteed gap: 65 ticks.
+```
+
+From Python:
+
+```python
+from brood import schedule, coincidence, Cadence
+
+schedule("~13", avoid=[5, 15, 30]).collision_free   # True
+coincidence(Cadence(13), Cadence(5))                # Coincidence(first=0, every=65)
+coincidence(Cadence(4), Cadence(6, 3))              # None — even vs odd ticks, never meet
+```
+
+Units are abstract ticks — minutes, seconds, frames, whatever your timeline counts.
 
 ---
 ## Whereof?

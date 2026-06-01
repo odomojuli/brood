@@ -17,6 +17,7 @@ from typing import List, Optional, Sequence, Tuple
 from . import __version__
 from .hamming import first_n_hamming, hamming_up_to
 from .primes import factorize, sieve_atkin
+from .schedule import Cadence, coincidence, schedule
 from .tables import format_table, multiplication_table
 from .wheel import coprimes_up_to, wheel, wheel_circumference
 
@@ -30,6 +31,19 @@ def _parse_basis(text: str) -> Tuple[int, ...]:
     if not basis:
         raise argparse.ArgumentTypeError("basis must contain at least one integer")
     return basis
+
+
+def _parse_cadence(text: str) -> Cadence:
+    """Parse ``"PERIOD"`` or ``"PERIOD:PHASE"`` into a Cadence."""
+    parts = text.split(":")
+    period = int(parts[0])
+    phase = int(parts[1]) if len(parts) > 1 else 0
+    return Cadence(period, phase)
+
+
+def _parse_avoid(text: str):
+    """Parse a comma-separated list of cadence specs into Cadence objects."""
+    return [_parse_cadence(tok) for tok in text.split(",") if tok.strip()]
 
 
 def _print_sequence(values: Sequence[int]) -> None:
@@ -71,6 +85,20 @@ def build_parser() -> argparse.ArgumentParser:
     p_table.add_argument("n", type=int)
     p_table.add_argument("--mod", type=int, default=None,
                          help="reduce entries modulo MOD (use a prime)")
+
+    p_sched = sub.add_parser("schedule", help="find a collision-avoiding slot")
+    p_sched.add_argument("--every", required=True,
+                         help="target period; prefix ~ to search nearby (e.g. ~13)")
+    p_sched.add_argument("--avoid", default="",
+                         help="existing jobs, comma-separated: PERIOD or PERIOD:PHASE")
+    p_sched.add_argument("--horizon", type=int, default=None,
+                         help="display window in ticks (default: one coincidence cycle)")
+    p_sched.add_argument("--search", type=int, default=6,
+                         help="how far to search around ~target (default: 6)")
+
+    p_coin = sub.add_parser("coincide", help="when do two cadences collide?")
+    p_coin.add_argument("a", help="cadence PERIOD[:PHASE]")
+    p_coin.add_argument("b", help="cadence PERIOD[:PHASE]")
 
     return parser
 
@@ -116,6 +144,19 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     elif args.command == "table":
         print(format_table(multiplication_table(args.n, mod=args.mod)))
+
+    elif args.command == "schedule":
+        rec = schedule(args.every, avoid=_parse_avoid(args.avoid),
+                       horizon=args.horizon, search=args.search)
+        print(rec.explain())
+
+    elif args.command == "coincide":
+        a, b = _parse_cadence(args.a), _parse_cadence(args.b)
+        co = coincidence(a, b)
+        if co is None:
+            print(f"{a}  vs  {b}:  never coincide")
+        else:
+            print(f"{a}  vs  {b}:  first at tick {co.first}, then every {co.every}")
 
     else:  # pragma: no cover - argparse enforces a valid command
         parser.error("unknown command")
