@@ -47,6 +47,7 @@ from .schedule import (
     find_slot,
     schedule,
 )
+from .scraper import Disallowed, PoliteScraper
 from .tables import format_table, multiplication_table
 from .wheel import coprimes_up_to, plot_wheel, wheel, wheel_circumference
 
@@ -90,6 +91,9 @@ __all__ = [
     "simulate",
     "conservative_gap",
     "Pacer",
+    # scraping
+    "PoliteScraper",
+    "Disallowed",
     # tables
     "multiplication_table",
     "format_table",

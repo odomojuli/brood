@@ -30,6 +30,7 @@ dependencies = []
 [project.optional-dependencies]
 viz = ["matplotlib>=3.5", "numpy>=1.21"]
 test = ["pytest>=7"]
+http = ["requests>=2.25"]   # for PoliteScraper.get()/crawl(); fetch() needs nothing
 
 [project.scripts]
 brood = "brood.cli:main"

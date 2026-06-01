@@ -113,6 +113,13 @@ def build_parser() -> argparse.ArgumentParser:
                         help="print a precomputed schedule of N timestamps")
     p_pace.add_argument("--seed", type=int, default=None, help="RNG seed")
 
+    p_scrape = sub.add_parser("scrape", help="fetch URLs politely (needs brood[http])")
+    p_scrape.add_argument("urls", nargs="+", help="one or more URLs")
+    p_scrape.add_argument("--per-second", type=float, default=1.0,
+                          help="polite request rate (default: 1.0)")
+    p_scrape.add_argument("--no-robots", action="store_true",
+                          help="do not consult robots.txt")
+
     return parser
 
 
@@ -190,6 +197,23 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"windows={windows}  basis={basis}")
             print(f"safe gaps in [{args.lo},{args.hi}]: {pool}")
             print("jitter sample:", " ".join(map(str, sample)))
+
+    elif args.command == "scrape":
+        from .scraper import Disallowed, PoliteScraper
+
+        scraper = PoliteScraper(per_second=args.per_second,
+                                obey_robots=not args.no_robots)
+        for url in args.urls:
+            try:
+                resp = scraper.get(url)
+                body = getattr(resp, "content", None)
+                if body is None:
+                    body = getattr(resp, "text", "") or ""
+                print(f"{getattr(resp, 'status_code', '?'):>3}  {len(body):>9}  {url}")
+            except Disallowed:
+                print(f"  -  robots.txt  {url}")
+            except Exception as exc:  # noqa: BLE001 - surface any client error
+                print(f"err  {type(exc).__name__}: {exc}  {url}")
 
     else:  # pragma: no cover - argparse enforces a valid command
         parser.error("unknown command")

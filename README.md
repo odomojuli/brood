@@ -65,6 +65,7 @@ pip install -e '.[test]'    # adds pytest
 | `brood.wheel` | Wheel factorization: the residues coprime to a prime basis — the slots that never collide — plus a clock visualization. |
 | `brood.schedule` | Collision-avoidance scheduler: place a job near a target cadence so it avoids — or maximally rarefies — coincidences with existing jobs, with exact CRT coincidence analysis. |
 | `brood.ratelimit` | Rate-limit-safe pacing for an *unknown* limit: gaps coprime to a set of assumed windows, plus the analysis tools to see what that does ([docs/rate-limiting.md](docs/rate-limiting.md)). |
+| `brood.scraper` | `PoliteScraper`: per-host paced, robots-aware, `Retry-After`-respecting HTTP for scrapers, built on the pacer ([docs/scraping.md](docs/scraping.md)). |
 | `brood.tables` | Multiplication tables for checking that a prime modulus generates a cyclic (abelian) group. |
 | `poisson.ipynb` | Notebook: approximate human-delay responses sampled from a Poisson process. |
 
@@ -162,6 +163,21 @@ brood pace --windows 1000,250,200 --fixed 220   # one fixed coprime interval
 ```
 
 For a real client, `brood.ratelimit.Pacer` wires the recommendation into a drop-in `run()` wrapper — your chosen rate, a phase-jittered start, coprime gaps between calls, and full-jitter backoff on 429s.
+
+### Polite scraping
+
+`brood.scraper.PoliteScraper` makes "be nice to their server" a one-liner: per-host paced, jittered requests that respect `Retry-After`, back off on 429/503, and obey `robots.txt` (`Crawl-delay` included). Full guide in **[docs/scraping.md](docs/scraping.md)**.
+
+```python
+from brood import PoliteScraper
+
+scraper = PoliteScraper(per_second=1)        # pip install 'brood[http]'
+html = scraper.get("https://example.com").text
+for url, resp in scraper.crawl(urls):        # paced, robots-aware, skips Disallow
+    ...
+```
+
+Or bring your own client (zero extra deps): `scraper.fetch(lambda: httpx.get(url), url)`.
 
 ---
 ## Whereof?
