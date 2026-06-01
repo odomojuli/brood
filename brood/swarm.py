@@ -44,6 +44,7 @@ except ImportError:  # pragma: no cover
 __all__ = ["Medium", "InMemoryMedium", "Swarm", "Member", "simulate_desync"]
 
 _MIN_RATE = 1e-6
+_RATE_KEY = "__rate__"  # reserved member id holding the shared AIMD budget
 
 
 # --------------------------------------------------------------------------- #
@@ -99,8 +100,10 @@ class Swarm:
     key: str = "brood"
     member_ttl: float = 10.0       # a member unseen this long is dropped
     quorum: int = 2                # throttle reports needed to slow the swarm
-    backoff_factor: float = 0.5    # multiply rate by this while quorum-throttled
+    backoff_factor: float = 0.5    # multiplicative-decrease factor on throttle
     backoff_window: float = 30.0   # seconds a throttle report stays "recent"
+    aimd: bool = False             # AIMD circuit-breaker instead of the step
+    recovery_rate: Optional[float] = None  # AIMD additive increase (rate/second)
     epoch: float = 0.0             # shared time origin for slot phases
     clock: Callable[[], float] = time.time
     sleep: Callable[[float], object] = time.sleep
@@ -108,6 +111,10 @@ class Swarm:
     def __post_init__(self) -> None:
         if self.rate <= 0:
             raise ValueError("rate must be positive")
+        if self.recovery_rate is None:
+            # recover one full multiplicative cut over a backoff_window.
+            self.recovery_rate = (self.rate * (1 - self.backoff_factor)
+                                  ) / max(self.backoff_window, 1e-9)
 
     @contextmanager
     def member(self, member_id: Optional[str] = None) -> Iterator["Member"]:
@@ -144,27 +151,50 @@ class Member:
         return now
 
     def report_throttle(self) -> None:
-        """Tell the swarm this worker was rate-limited (feeds the quorum)."""
-        self.heartbeat(throttle=self.swarm.clock())
+        """Tell the swarm this worker was rate-limited.
+
+        In step mode this just feeds the quorum. In AIMD mode it applies a
+        multiplicative decrease to the shared budget, deduping a burst of
+        near-simultaneous reports into a single cut.
+        """
+        now = self.heartbeat(throttle=self.swarm.clock())
+        if not self.swarm.aimd:
+            return
+        snapshot = self.swarm.medium.read(self.swarm.key)
+        rec = snapshot.get(_RATE_KEY)
+        epsilon = 1.0 / self.swarm.rate            # one nominal interval
+        if rec is not None and now - rec.get("at", -1e18) < epsilon:
+            return                                  # already cut this instant
+        current = self._aimd_rate(snapshot, now)
+        cut = max(current * self.swarm.backoff_factor, _MIN_RATE)
+        self.swarm.medium.write(self.swarm.key, _RATE_KEY,
+                                {"budget": cut, "at": now})
 
     def live_members(self) -> List[str]:
         """Sorted ids of members seen within the TTL (this one included)."""
         now = self.swarm.clock()
         snapshot = self.swarm.medium.read(self.swarm.key)
         live = [m for m, r in snapshot.items()
-                if now - r.get("seen", 0.0) <= self.swarm.member_ttl]
+                if not m.startswith("__")          # skip reserved entries
+                and now - r.get("seen", 0.0) <= self.swarm.member_ttl]
         if self.id not in live:
             live.append(self.id)
         return sorted(live)
 
     def effective_rate(self) -> float:
-        """The swarm's current global rate, lowered if a quorum was throttled.
+        """The swarm's current global rate, lowered after rate-limit reports.
 
-        Computed purely from the shared throttle traces, so every member agrees
-        without a shared mutable rate variable (stigmergy again).
+        Computed from the shared traces so every member agrees without a private
+        rate variable (stigmergy). ``aimd=False`` (default) is a step: while a
+        *quorum* of members has a recent throttle, the rate is multiplied by
+        ``backoff_factor``. ``aimd=True`` is additive-increase /
+        multiplicative-decrease -- a hard cut on each throttle, then a linear
+        recovery -- i.e. TCP-style congestion control over the shared budget.
         """
         now = self.swarm.clock()
         snapshot = self.swarm.medium.read(self.swarm.key)
+        if self.swarm.aimd:
+            return self._aimd_rate(snapshot, now)
         recent = sum(
             1 for r in snapshot.values()
             if r.get("throttle") is not None
@@ -173,6 +203,16 @@ class Member:
         if recent >= self.swarm.quorum:
             return max(self.swarm.rate * self.swarm.backoff_factor, _MIN_RATE)
         return self.swarm.rate
+
+    def _aimd_rate(self, snapshot: Dict[str, dict], now: float) -> float:
+        """AIMD budget: the stored value plus linear (additive) recovery since
+        the last multiplicative cut, capped at the base rate."""
+        rec = snapshot.get(_RATE_KEY)
+        if rec is None:
+            return self.swarm.rate
+        recovered = rec.get("budget", self.swarm.rate) + \
+            self.swarm.recovery_rate * max(0.0, now - rec.get("at", now))
+        return min(self.swarm.rate, max(recovered, _MIN_RATE))
 
     # --- pacing ---------------------------------------------------------- #
     def _slot(self):

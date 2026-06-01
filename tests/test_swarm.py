@@ -158,3 +158,66 @@ def test_simulate_desync_reproducible():
 def test_simulate_desync_validation(n, alpha):
     with pytest.raises(ValueError):
         simulate_desync(n, alpha=alpha)
+
+
+# --------------------------------------------------------------------------- #
+# AIMD circuit-breaker (congestion control over the shared budget)
+# --------------------------------------------------------------------------- #
+def test_aimd_multiplicative_decrease():
+    swarm, _ = make_swarm(rate=4.0, aimd=True, backoff_window=10.0)
+    (a,) = _members(swarm, "a")
+    assert a.effective_rate() == 4.0
+    a.report_throttle()
+    assert a.effective_rate() == pytest.approx(2.0)      # x backoff_factor
+
+
+def test_aimd_additive_recovery_and_cap():
+    swarm, clk = make_swarm(rate=4.0, aimd=True, backoff_window=10.0)  # +0.2/s
+    (a,) = _members(swarm, "a")
+    a.report_throttle()
+    assert a.effective_rate() == pytest.approx(2.0)
+    clk.t = 5.0
+    assert a.effective_rate() == pytest.approx(3.0)      # 2.0 + 0.2 * 5
+    clk.t = 1000.0
+    assert a.effective_rate() == 4.0                      # capped at base
+
+
+def test_aimd_members_share_the_budget():
+    swarm, _ = make_swarm(rate=4.0, aimd=True)
+    a, b = _members(swarm, "a", "b")
+    a.report_throttle()
+    assert a.effective_rate() == b.effective_rate()       # stigmergy
+
+
+def test_aimd_dedupes_simultaneous_reports():
+    swarm, _ = make_swarm(rate=4.0, aimd=True)
+    a, b, c = _members(swarm, "a", "b", "c")
+    a.report_throttle()
+    b.report_throttle()
+    c.report_throttle()                                   # same instant
+    assert a.effective_rate() == pytest.approx(2.0)       # one cut, not three
+
+
+def test_aimd_compounds_separate_events():
+    swarm, clk = make_swarm(rate=4.0, aimd=True, backoff_window=10.0)
+    (a,) = _members(swarm, "a")
+    a.report_throttle()                 # -> 2.0 at t=0
+    clk.t = 1.0
+    a.report_throttle()                 # recover to 2.2, then cut -> 1.1
+    assert a.effective_rate() == pytest.approx(1.1)
+
+
+def test_aimd_budget_not_counted_as_member():
+    swarm, _ = make_swarm(rate=4.0, aimd=True)
+    a, b = _members(swarm, "a", "b")
+    a.report_throttle()                 # writes the reserved __rate__ entry
+    assert a.live_members() == ["a", "b"]
+
+
+def test_aimd_stays_within_bounds_under_pressure():
+    swarm, clk = make_swarm(rate=4.0, aimd=True, backoff_window=10.0)
+    (a,) = _members(swarm, "a")
+    for i in range(80):
+        clk.t = i * 0.5                 # > epsilon, so each report cuts
+        a.report_throttle()
+    assert 0 < a.effective_rate() <= 4.0

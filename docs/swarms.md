@@ -87,6 +87,25 @@ effective rate -> 1.0            # halved
 slots          -> [0.0, 1.0, 2.0]  # aggregate now 1 req/s
 ```
 
+**AIMD circuit-breaker (`aimd=True`).** The step above is binary; set `aimd=True`
+for additive-increase / multiplicative-decrease — TCP-style congestion control
+over the shared budget. Each throttle multiplies the budget by `backoff_factor`
+(a hard cut, deduping a burst into one); the rate then recovers *linearly* over
+time, capped at the base. The cut is written to the medium, the recovery is
+computed lazily on read — so it stays stigmergic, with no coordinating writer:
+
+```text
+>>> Swarm(rate=4.0, aimd=True, backoff_window=10):
+report_throttle()   -> 2.0     # multiplicative decrease (x0.5)
++5 s                -> 3.0     # additive increase  (+0.2/s)
+fully recovered     -> 4.0     # capped at the base
+```
+
+It makes the swarm a set of competing flows that converge to the server's actual
+limit — additive-increase / multiplicative-decrease is the rule behind TCP
+congestion control, provably reaching a fair, efficient allocation. "Rate
+limiting is congestion control," made literal.
+
 ## Testing your own swarm
 
 `Swarm` takes injectable `clock` and `sleep`, so an entire fleet — membership,

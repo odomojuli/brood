@@ -178,10 +178,10 @@ where the tension is sharpest.
   a golden-ratio schedule, modestly flatter than random jitter in a wide band —
   but it *resonates* when the band sits at the window size (rate-limiting.md
   Finding 5). Open: van der Corput / Halton variants.
-- **Adaptive desync — now in `brood.swarm`** (§8): independent clients
-  coordinate phases through a shared medium at runtime, not just by
-  construction. Open refinement: a smoother AIMD for the quorum
-  circuit-breaker instead of the current step.
+- **Adaptive desync — in `brood.swarm`** (§8): clients coordinate phases through
+  a shared medium at runtime. The collective backoff now offers a TCP-style
+  **AIMD** circuit-breaker (`aimd=True`) alongside the step. Open: a leaderless
+  *drift* runtime mode (midpoint nudge from neighbours, no shared roster).
 - **The harmonic/coprime dial — now in `brood.schedule`** (§5):
   `find_slot(..., align=True)` snaps to harmonic (predictable, frequent
   coincidence), `align=False` to coprime (contention-avoidance). Open: extend
