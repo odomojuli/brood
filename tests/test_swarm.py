@@ -221,3 +221,41 @@ def test_aimd_stays_within_bounds_under_pressure():
         clk.t = i * 0.5                 # > epsilon, so each report cuts
         a.report_throttle()
     assert 0 < a.effective_rate() <= 4.0
+
+
+# --------------------------------------------------------------------------- #
+# Leaderless drift mode (runtime midpoint nudge, no roster ranks)
+# --------------------------------------------------------------------------- #
+def test_drift_solo_paces_at_period():
+    swarm, _ = make_swarm(rate=5.0, drift=True)
+    (m,) = _members(swarm, "solo")
+    fires = [m.wait() for _ in range(4)]
+    gaps = [b - a for a, b in zip(fires, fires[1:])]
+    assert all(b > a for a, b in zip(fires, fires[1:]))
+    assert all(abs(g - 0.2) < 1e-9 for g in gaps)   # no neighbours -> steady 1/rate
+
+
+def test_drift_converges_to_even_spacing():
+    n, rate = 8, 4.0
+    cycle = n / rate
+    swarm, _ = make_swarm(rate=rate, drift=True, drift_alpha=0.5, member_ttl=1e12)
+    members = [Member(swarm, f"m{i}") for i in range(n)]
+    for m in members:
+        m.heartbeat()
+
+    def spread():
+        phases = sorted(m._last_fire % cycle for m in members)
+        gaps = [(phases[(i + 1) % n] - phases[i]) % cycle for i in range(n)]
+        gaps = [g if g > 0 else cycle for g in gaps]
+        mean = sum(gaps) / n
+        return (sum((g - mean) ** 2 for g in gaps) / n) ** 0.5
+
+    for m in members:           # first fires take distinct crc-based phases
+        m.wait()
+    start = spread()
+    for _ in range(80):         # then drift toward even, leaderlessly
+        for m in members:
+            m.wait()
+    end = spread()
+    assert end < start / 5      # evened out substantially
+    assert end < 0.02           # close to the ideal gap (0.25)

@@ -32,6 +32,7 @@ from __future__ import annotations
 import math
 import time
 import uuid
+import zlib
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Iterator, List, Optional
@@ -104,6 +105,8 @@ class Swarm:
     backoff_window: float = 30.0   # seconds a throttle report stays "recent"
     aimd: bool = False             # AIMD circuit-breaker instead of the step
     recovery_rate: Optional[float] = None  # AIMD additive increase (rate/second)
+    drift: bool = False            # leaderless midpoint nudge instead of roster
+    drift_alpha: float = 0.5       # nudge fraction toward the neighbour midpoint
     epoch: float = 0.0             # shared time origin for slot phases
     clock: Callable[[], float] = time.time
     sleep: Callable[[float], object] = time.sleep
@@ -235,11 +238,46 @@ class Member:
         """The next tick this member should fire on its evenly-spaced slot."""
         return self._slot()[1]
 
+    def _drift_slot(self):
+        """Heartbeat, then return ``(now, next fire)`` by the leaderless midpoint
+        rule -- no roster ranks, only the two nearest neighbours' last fires.
+
+        Converges to even spacing the way :func:`simulate_desync` does, but at
+        runtime and with only local information.
+        """
+        now = self.heartbeat()
+        cycle = len(self.live_members()) / self.effective_rate()
+
+        if self._last_fire == float("-inf"):
+            # a distinct starting phase per id breaks the synchronized symmetry
+            init = (zlib.crc32(self.id.encode()) / 2 ** 32) * cycle
+            k = math.ceil((now - self.swarm.epoch - init) / cycle)
+            return now, self.swarm.epoch + init + k * cycle
+
+        snapshot = self.swarm.medium.read(self.swarm.key)
+        others = [(snapshot[m]["fire"] - self.swarm.epoch) % cycle
+                  for m in self.live_members()
+                  if m != self.id and snapshot.get(m, {}).get("fire") is not None]
+
+        target = self._last_fire + cycle
+        if others:
+            phase = (self._last_fire - self.swarm.epoch) % cycle
+            ahead = min((o - phase) % cycle for o in others)
+            behind = min((phase - o) % cycle for o in others)
+            target += self.swarm.drift_alpha * (ahead - behind) / 2.0
+
+        while target <= self._last_fire or target < now:
+            target += cycle
+        return now, target
+
     def wait(self) -> float:
         """Block until this member's next slot, then record the fire."""
-        _now, target, cycle = self._slot()
-        while target <= self._last_fire:    # never fire the same slot twice
-            target += cycle
+        if self.swarm.drift:
+            _now, target = self._drift_slot()
+        else:
+            _now, target, cycle = self._slot()
+            while target <= self._last_fire:    # never fire the same slot twice
+                target += cycle
         self.swarm.sleep(max(0.0, target - self.swarm.clock()))
         self._last_fire = target
         self.heartbeat(fire=target)

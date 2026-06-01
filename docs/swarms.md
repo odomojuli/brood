@@ -76,6 +76,15 @@ spread (std of gaps): 0.1288  ->  0.000003     # evens out
 final phases: 0.098, 0.223, 0.348, ... 0.973   # ~0.125 apart (ideal gap 1/8)
 ```
 
+**Leaderless drift (`drift=True`).** The slotting above still needs everyone to
+agree on the roster. Set `drift=True` and members instead run that midpoint rule
+*at runtime*: each looks only at its two nearest phase-neighbours' last fires
+(from the medium) and nudges toward their midpoint — no ranks, no agreed
+ordering. From distinct (id-seeded) starting phases it converges to even spacing
+exactly as `simulate_desync` does — the truest self-organization. The trade-off
+is a transient: it spreads over several cycles instead of snapping to even at
+once.
+
 **Quorum circuit-breaker.** Each worker that gets rate-limited calls
 `report_throttle()`. When a quorum of *distinct* workers have throttled within
 `backoff_window`, every member computes the same lowered rate from the shared

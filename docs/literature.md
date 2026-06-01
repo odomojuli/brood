@@ -179,9 +179,10 @@ where the tension is sharpest.
   but it *resonates* when the band sits at the window size (rate-limiting.md
   Finding 5). Open: van der Corput / Halton variants.
 - **Adaptive desync — in `brood.swarm`** (§8): clients coordinate phases through
-  a shared medium at runtime. The collective backoff now offers a TCP-style
-  **AIMD** circuit-breaker (`aimd=True`) alongside the step. Open: a leaderless
-  *drift* runtime mode (midpoint nudge from neighbours, no shared roster).
+  a shared medium at runtime — by roster slotting, by a TCP-style **AIMD**
+  circuit-breaker (`aimd=True`), and by a leaderless **drift** mode
+  (`drift=True`: midpoint nudge from neighbours, no shared roster). The DESYNC
+  thread, fully realized.
 - **The harmonic/coprime dial — now in `brood.schedule`** (§5):
   `find_slot(..., align=True)` snaps to harmonic (predictable, frequent
   coincidence), `align=False` to coprime (contention-avoidance). Open: extend
