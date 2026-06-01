@@ -28,9 +28,11 @@ Units are whatever your timeline counts; the examples use milliseconds.
 from __future__ import annotations
 
 import random
+import time
 from collections import Counter
+from dataclasses import dataclass
 from math import gcd
-from typing import Dict, Iterator, List, Optional, Sequence
+from typing import Callable, Dict, Iterator, List, Optional, Sequence
 
 from .primes import factorize
 
@@ -46,6 +48,8 @@ __all__ = [
     "max_fixed_bucket",
     "max_sliding",
     "simulate",
+    "conservative_gap",
+    "Pacer",
 ]
 
 
@@ -229,3 +233,131 @@ def simulate(times: Sequence[int], window: int, capacity: int) -> Dict[str, int]
         "rejected": rejected,
         "max_burst": max(counts.values()) if counts else 0,
     }
+
+
+# --------------------------------------------------------------------------- #
+# Ready-to-use client helper
+# --------------------------------------------------------------------------- #
+def conservative_gap(windows: Sequence[int], capacity: int = 1) -> int:
+    """The mean gap that keeps you under ``capacity`` requests per window, for
+    *every* assumed window -- the rate lever from docs/rate-limiting.md.
+
+    Equals ``ceil(max(windows) / capacity)``: the largest window binds, since
+    you do not know which one is real.
+
+    >>> conservative_gap([1000, 250, 200])      # assume 1 request per window
+    1000
+    >>> conservative_gap([1000, 250, 200], 4)   # assume 4 per window
+    250
+    """
+    if capacity < 1:
+        raise ValueError("capacity must be >= 1")
+    return -(-max(windows) // capacity)  # ceiling division
+
+
+@dataclass
+class Pacer:
+    """Drop-in pacing for an unknown rate limit.
+
+    Wires together the three levers from ``docs/rate-limiting.md`` plus retry
+    backoff:
+
+    1. **Rate** -- you pick the gap band ``[lo, hi]`` (see
+       :func:`conservative_gap`); nothing else changes how many requests land
+       in a bucket.
+    2. **Phase** -- :meth:`start_delay` offers a random start offset (full
+       jitter) so many clients triggered together do not stampede.
+    3. **Coprime gaps** -- inter-request delays are drawn from
+       :func:`safe_gaps`, spreading you across every candidate window's phases.
+    4. **Backoff** -- :meth:`backoff` is full-jitter exponential backoff for
+       when the server pushes back (HTTP 429 and friends).
+
+    The scheduling methods are pure and seedable; :meth:`run` is the blocking
+    wrapper, with an injectable ``sleep`` so it is testable without real time.
+
+    >>> p = Pacer([1000, 250, 200], 200, 240, seed=0)
+    >>> plan = p.plan(5)
+    >>> 0 <= plan[0] < 1000                      # phase-jittered start
+    True
+    >>> all(is_safe_gap(b - a, [1000, 250, 200]) for a, b in zip(plan, plan[1:]))
+    True
+    """
+
+    windows: Sequence[int]
+    lo: int
+    hi: int
+    base_backoff: int = 100        # ms, the backoff at attempt 0
+    max_backoff: int = 10_000      # ms, the backoff ceiling
+    jitter_start: bool = True
+    seed: Optional[int] = None
+
+    def __post_init__(self) -> None:
+        self._pool = safe_gaps(self.windows, self.lo, self.hi)
+        if not self._pool:
+            raise ValueError("no gaps in [lo, hi] are coprime to all windows")
+        self._rng = random.Random(self.seed)
+        self._max_window = max(self.windows)
+        self._started = False
+
+    # --- pure scheduling -------------------------------------------------- #
+    def start_delay(self) -> int:
+        """A random start offset in ``[0, max(windows))`` -- full jitter."""
+        return self._rng.randrange(self._max_window)
+
+    def next_gap(self) -> int:
+        """The next coprime-safe inter-request gap."""
+        return self._rng.choice(self._pool)
+
+    def plan(self, n: int, start: int = 0) -> List[int]:
+        """``n`` absolute timestamps: jittered start, then coprime gaps."""
+        if n <= 0:
+            return []
+        offset = self.start_delay() if self.jitter_start else 0
+        times = [start + offset]
+        for _ in range(n - 1):
+            times.append(times[-1] + self.next_gap())
+        return times
+
+    def backoff(self, attempt: int) -> int:
+        """Full-jitter exponential backoff: ``randint(0, min(cap, base*2**a))``.
+
+        Marc Brooker, *Exponential Backoff And Jitter* (AWS).
+        """
+        ceiling = min(self.max_backoff, self.base_backoff * (2 ** attempt))
+        return self._rng.randint(0, ceiling)
+
+    # --- ready-to-use blocking wrapper ------------------------------------ #
+    def run(
+        self,
+        fn: Callable[[], object],
+        *,
+        retries: int = 5,
+        rate_limited: Optional[Callable[[Exception], bool]] = None,
+        sleep: Callable[[float], object] = time.sleep,
+    ) -> object:
+        """Pace one call, retrying with backoff-and-jitter when rate-limited.
+
+        ``fn`` is your request (a zero-argument callable).  ``rate_limited(exc)``
+        returns True when an exception means "slow down" (e.g. HTTP 429).  Call
+        :meth:`run` once per request -- it spaces successive calls by a safe gap
+        (and the first by the start jitter).  ``sleep`` is injectable for tests.
+        """
+        is_limit = rate_limited or (lambda exc: False)
+
+        if not self._started:
+            self._started = True
+            if self.jitter_start:
+                sleep(self.start_delay())
+        else:
+            sleep(self.next_gap())
+
+        attempt = 0
+        while True:
+            try:
+                return fn()
+            except Exception as exc:  # noqa: BLE001 - re-raised unless rate-limited
+                if is_limit(exc) and attempt < retries:
+                    sleep(self.backoff(attempt))
+                    attempt += 1
+                    continue
+                raise

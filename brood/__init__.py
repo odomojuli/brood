@@ -24,6 +24,8 @@ from __future__ import annotations
 from .hamming import first_n_hamming, hamming, hamming_up_to, is_hamming
 from .primes import factorize, is_prime, primes_up_to, sieve_atkin
 from .ratelimit import (
+    Pacer,
+    conservative_gap,
     fixed_interval,
     jitter,
     max_fixed_bucket,
@@ -86,6 +88,8 @@ __all__ = [
     "max_fixed_bucket",
     "max_sliding",
     "simulate",
+    "conservative_gap",
+    "Pacer",
     # tables
     "multiplication_table",
     "format_table",

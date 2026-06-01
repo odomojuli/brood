@@ -159,6 +159,55 @@ trip the limit. `brood.ratelimit` gives you all three output forms (a seedable
 jitter stream, a fixed coprime interval, and a precomputed schedule) so you can
 combine rate, jitter, and coprime gaps as above.
 
+## 8. Ready-to-use: the `Pacer`
+
+`brood.ratelimit.Pacer` wires the four pieces together so you don't have to
+re-derive them at each call site: the **rate** you choose (a gap band, sized
+with `conservative_gap`), a phase-jittered **start**, **coprime gaps** between
+calls, and **full-jitter exponential backoff** when the server pushes back.
+
+`conservative_gap` encodes the rate lever — the largest assumed window binds,
+because you do not know which is real:
+
+```python
+>>> from brood.ratelimit import conservative_gap
+>>> conservative_gap([1000, 250, 200], capacity=4)   # ~4 requests per window
+250
+```
+
+The scheduling is pure and seedable, so you can inspect or test it directly.
+The first timestamp is jittered into `[0, max window)`; every gap is coprime to
+all the windows:
+
+```python
+>>> from brood.ratelimit import Pacer
+>>> Pacer([1000, 250, 200], 200, 280, seed=11).plan(8)
+[463, 736, 1007, 1238, 1467, 1744, 1973, 2190]
+```
+
+In a real client, `run` paces each call and retries with backoff-and-jitter on
+a rate-limit signal. `sleep` is injectable, so the same object is unit-testable
+without real time:
+
+```python
+from brood.ratelimit import Pacer, conservative_gap
+
+gap = conservative_gap([1000, 250, 200], capacity=4)        # 250 ms
+pacer = Pacer([1000, 250, 200], lo=gap - 30, hi=gap + 30)   # rate band
+
+def fetch():
+    resp = http_get(url)
+    if resp.status == 429:
+        raise RateLimited()
+    return resp
+
+# call once per request; it spaces calls and backs off on 429s
+result = pacer.run(fetch, rate_limited=lambda e: isinstance(e, RateLimited))
+```
+
+This is the honest synthesis in code: rate and phase-jitter do the heavy
+lifting, with coprime gaps spreading you across every candidate window.
+
 ## References
 
 1. Marc Brooker, *Exponential Backoff And Jitter*, AWS Architecture Blog —

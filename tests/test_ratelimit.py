@@ -6,6 +6,8 @@ from math import gcd
 import pytest
 
 from brood.ratelimit import (
+    Pacer,
+    conservative_gap,
     fixed_interval,
     is_safe_gap,
     jitter,
@@ -169,3 +171,87 @@ def test_coprime_periods_recollide_least():
     coprime = len(collisions(Cadence(199), Cadence(211), horizon))  # lcm 41989
     assert harmonic > 100   # identical -> collide on every firing
     assert coprime <= 2     # coprime -> only at multiples of the lcm
+
+
+# --------------------------------------------------------------------------- #
+# Pacer -- the ready-to-use helper wiring the three levers together
+# --------------------------------------------------------------------------- #
+def test_conservative_gap():
+    assert conservative_gap(WINDOWS) == 1000        # 1 per window -> 1000 ms
+    assert conservative_gap(WINDOWS, 4) == 250      # 4 per window -> 250 ms
+    assert conservative_gap(WINDOWS, 3) == 334      # ceil(1000 / 3)
+
+
+def test_pacer_plan_jittered_start_and_safe_gaps():
+    plan = Pacer(WINDOWS, 200, 240, seed=0).plan(20)
+    assert len(plan) == 20 and plan == sorted(plan)
+    assert 0 <= plan[0] < max(WINDOWS)              # phase-jittered start
+    gaps = [b - a for a, b in zip(plan, plan[1:])]
+    assert all(is_safe_gap(g, WINDOWS) for g in gaps)
+
+
+def test_pacer_plan_reproducible():
+    assert (Pacer(WINDOWS, 200, 240, seed=5).plan(10)
+            == Pacer(WINDOWS, 200, 240, seed=5).plan(10))
+
+
+def test_pacer_no_jitter_start():
+    assert Pacer(WINDOWS, 200, 240, jitter_start=False, seed=0).plan(3)[0] == 0
+
+
+def test_pacer_backoff_full_jitter_bounds():
+    p = Pacer(WINDOWS, 200, 240, base_backoff=100, max_backoff=1000, seed=0)
+    for attempt in range(8):
+        ceiling = min(1000, 100 * 2 ** attempt)
+        for _ in range(50):
+            assert 0 <= p.backoff(attempt) <= ceiling
+
+
+def test_pacer_no_safe_gaps_raises():
+    with pytest.raises(ValueError):
+        Pacer([2], 4, 4)  # nothing in [4,4] is coprime to 2
+
+
+def test_pacer_run_paces_retries_and_succeeds():
+    class RateLimited(Exception):
+        pass
+
+    attempts = {"n": 0}
+
+    def flaky():
+        attempts["n"] += 1
+        if attempts["n"] <= 2:          # rejected twice, then succeeds
+            raise RateLimited()
+        return "ok"
+
+    sleeps = []
+    p = Pacer(WINDOWS, 200, 240, base_backoff=100, max_backoff=1000, seed=0)
+    result = p.run(flaky,
+                   rate_limited=lambda e: isinstance(e, RateLimited),
+                   sleep=sleeps.append)
+
+    assert result == "ok"
+    assert attempts["n"] == 3
+    assert len(sleeps) == 3                          # start jitter + 2 backoffs
+    assert 0 <= sleeps[0] < max(WINDOWS)             # phase jitter
+    assert 0 <= sleeps[1] <= 100                     # backoff(0) <= base
+    assert 0 <= sleeps[2] <= 200                     # backoff(1) <= 2 * base
+
+
+def test_pacer_run_spaces_successive_calls():
+    p = Pacer(WINDOWS, 200, 240, seed=0)
+    sleeps = []
+    p.run(lambda: "a", sleep=sleeps.append)          # first -> start jitter
+    p.run(lambda: "b", sleep=sleeps.append)          # second -> a safe gap
+    assert 0 <= sleeps[0] < max(WINDOWS)
+    assert is_safe_gap(sleeps[1], WINDOWS)
+
+
+def test_pacer_run_reraises_other_errors():
+    p = Pacer(WINDOWS, 200, 240, seed=0)
+
+    def boom():
+        raise KeyError("nope")
+
+    with pytest.raises(KeyError):
+        p.run(boom, rate_limited=lambda e: False, sleep=lambda s: None)

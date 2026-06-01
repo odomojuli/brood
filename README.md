@@ -161,6 +161,8 @@ brood pace --windows 1000,250,200 --n 8    # a precomputed schedule
 brood pace --windows 1000,250,200 --fixed 220   # one fixed coprime interval
 ```
 
+For a real client, `brood.ratelimit.Pacer` wires the recommendation into a drop-in `run()` wrapper — your chosen rate, a phase-jittered start, coprime gaps between calls, and full-jitter backoff on 429s.
+
 ---
 ## Whereof?
 
