@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "brood"
+version = "0.1.0"
+description = "Number-theoretic tools for scheduling on the off-beat -- cicada-inspired desynchronization."
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [{ name = "odomojuli" }]
+keywords = [
+    "primes",
+    "scheduling",
+    "cron",
+    "cicada",
+    "number-theory",
+    "hamming-numbers",
+    "wheel-factorization",
+    "sieve-of-atkin",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Intended Audience :: Science/Research",
+]
+dependencies = []
+
+# Core stays dependency-free. The clock plot and the test suite are extras.
+[project.optional-dependencies]
+viz = ["matplotlib>=3.5", "numpy>=1.21"]
+test = ["pytest>=7"]
+
+[project.scripts]
+brood = "brood.cli:main"
+
+[tool.setuptools]
+packages = ["brood"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
