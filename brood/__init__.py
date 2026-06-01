@@ -23,6 +23,18 @@ from __future__ import annotations
 
 from .hamming import first_n_hamming, hamming, hamming_up_to, is_hamming
 from .primes import factorize, is_prime, primes_up_to, sieve_atkin
+from .ratelimit import (
+    fixed_interval,
+    jitter,
+    max_fixed_bucket,
+    max_sliding,
+    phase_histogram,
+    phase_uniformity,
+    safe_gaps,
+    schedule_n,
+    simulate,
+    window_basis,
+)
 from .schedule import (
     Cadence,
     Coincidence,
@@ -63,6 +75,17 @@ __all__ = [
     "Recommendation",
     "find_slot",
     "schedule",
+    # rate limiting
+    "window_basis",
+    "safe_gaps",
+    "jitter",
+    "fixed_interval",
+    "schedule_n",
+    "phase_histogram",
+    "phase_uniformity",
+    "max_fixed_bucket",
+    "max_sliding",
+    "simulate",
     # tables
     "multiplication_table",
     "format_table",

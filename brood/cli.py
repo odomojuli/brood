@@ -12,11 +12,13 @@ Subcommands
 from __future__ import annotations
 
 import argparse
+from itertools import islice
 from typing import List, Optional, Sequence, Tuple
 
 from . import __version__
 from .hamming import first_n_hamming, hamming_up_to
 from .primes import factorize, sieve_atkin
+from .ratelimit import fixed_interval, jitter, safe_gaps, schedule_n, window_basis
 from .schedule import Cadence, coincidence, schedule
 from .tables import format_table, multiplication_table
 from .wheel import coprimes_up_to, wheel, wheel_circumference
@@ -100,6 +102,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_coin.add_argument("a", help="cadence PERIOD[:PHASE]")
     p_coin.add_argument("b", help="cadence PERIOD[:PHASE]")
 
+    p_pace = sub.add_parser("pace", help="rate-limit-safe pacing for an unknown limit")
+    p_pace.add_argument("--windows", default="1000,250,200",
+                        help="assumed limit windows in ms (default: 1000,250,200)")
+    p_pace.add_argument("--lo", type=int, default=200, help="min gap (default 200)")
+    p_pace.add_argument("--hi", type=int, default=240, help="max gap (default 240)")
+    p_pace.add_argument("--fixed", type=int, default=None, metavar="TARGET",
+                        help="print the fixed coprime interval nearest TARGET")
+    p_pace.add_argument("--n", type=int, default=None, metavar="N",
+                        help="print a precomputed schedule of N timestamps")
+    p_pace.add_argument("--seed", type=int, default=None, help="RNG seed")
+
     return parser
 
 
@@ -157,6 +170,26 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"{a}  vs  {b}:  never coincide")
         else:
             print(f"{a}  vs  {b}:  first at tick {co.first}, then every {co.every}")
+
+    elif args.command == "pace":
+        windows = [int(w) for w in args.windows.split(",") if w.strip()]
+        basis = window_basis(windows)
+        if args.fixed is not None:
+            print(f"windows={windows}  basis={basis}")
+            print(f"fixed coprime interval near {args.fixed}: "
+                  f"{fixed_interval(windows, args.fixed)}")
+        elif args.n is not None:
+            times = schedule_n(args.n, windows, args.lo, args.hi, seed=args.seed)
+            print(f"windows={windows}  basis={basis}  "
+                  f"({len(safe_gaps(windows, args.lo, args.hi))} safe gaps "
+                  f"in [{args.lo},{args.hi}])")
+            print(" ".join(map(str, times)))
+        else:
+            pool = safe_gaps(windows, args.lo, args.hi)
+            sample = list(islice(jitter(windows, args.lo, args.hi, seed=args.seed), 12))
+            print(f"windows={windows}  basis={basis}")
+            print(f"safe gaps in [{args.lo},{args.hi}]: {pool}")
+            print("jitter sample:", " ".join(map(str, sample)))
 
     else:  # pragma: no cover - argparse enforces a valid command
         parser.error("unknown command")

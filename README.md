@@ -64,6 +64,7 @@ pip install -e '.[test]'    # adds pytest
 | `brood.hamming` | Lazy Dijkstra generator for Hamming / 5-smooth numbers (OEIS A051037), plus an `is_hamming` test. |
 | `brood.wheel` | Wheel factorization: the residues coprime to a prime basis — the slots that never collide — plus a clock visualization. |
 | `brood.schedule` | Collision-avoidance scheduler: place a job near a target cadence so it avoids — or maximally rarefies — coincidences with existing jobs, with exact CRT coincidence analysis. |
+| `brood.ratelimit` | Rate-limit-safe pacing for an *unknown* limit: gaps coprime to a set of assumed windows, plus the analysis tools to see what that does ([docs/rate-limiting.md](docs/rate-limiting.md)). |
 | `brood.tables` | Multiplication tables for checking that a prime modulus generates a cyclic (abelian) group. |
 | `poisson.ipynb` | Notebook: approximate human-delay responses sampled from a Poisson process. |
 
@@ -149,6 +150,16 @@ coincidence(Cadence(4), Cadence(6, 3))              # None — even vs odd ticks
 ```
 
 Units are abstract ticks — minutes, seconds, frames, whatever your timeline counts.
+
+### Pacing against an unknown rate limit
+
+`brood.ratelimit` applies the same idea to rate limiting. If you don't know the limit but can guess a few common windows — say 1000 / 250 / 200 ms — it paces requests with gaps coprime to all of them (those windows are 2·5-smooth, so the safe set is the wheel(2, 5) spokes). A full, honestly-troubleshooted treatment — including where the desync trick *doesn't* help (single-stream burst size is governed by your rate, not your gaps) and where it does (phase coverage, and keeping clients from re-synchronizing) — is in **[docs/rate-limiting.md](docs/rate-limiting.md)**.
+
+```sh
+brood pace --windows 1000,250,200          # a safe jitter sample
+brood pace --windows 1000,250,200 --n 8    # a precomputed schedule
+brood pace --windows 1000,250,200 --fixed 220   # one fixed coprime interval
+```
 
 ---
 ## Whereof?
