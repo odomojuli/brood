@@ -123,14 +123,61 @@ where the tension is sharpest.
   for a herd, *phase jitter* is the lever, not period coprimality
   ([rate-limiting.md](rate-limiting.md), Finding 3).
 
+## 8. Swarms & collective behaviour
+
+- **Reynolds, C. W. (1987). "Flocks, Herds and Schools: A Distributed Behavioral Model." *SIGGRAPH '87*.**
+  The "boids" model: three local rules (separation, alignment, cohesion) yield
+  lifelike flocking — the origin of "simple local rules → global order."
+  **→** the design principle behind `brood.swarm`'s per-member behaviour.
+
+- **Vicsek, T., et al. (1995). "Novel Type of Phase Transition in a System of Self-Driven Particles." *Phys. Rev. Lett.* 75: 1226–1229.**
+  The minimal physics of flocking; a sharp order/disorder transition with noise
+  or density. **→** minor local changes flip global behaviour.
+
+- **Couzin, I. D., et al. (2002). "Collective memory and spatial sorting in animal groups." *J. Theor. Biol.*** ([Consensus](https://consensus.app/papers/details/c95e349a766b52fc9d508c5ac6126819/?utm_source=claude_code))
+  Simple "rules of thumb" let individuals position themselves with no global
+  information; small interaction changes cause major group transitions.
+  **→** why decentralized slotting can work from local views.
+
+- **Sarfati, R., et al. (2023). "Emergent periodicity in the collective synchronous flashing of fireflies." *eLife*.** ([Consensus](https://consensus.app/papers/details/43e25191de245128a73d37fd7ef33ec9/?utm_source=claude_code))
+  Rhythm emerges from a decentralized "follow-the-leader" coupling where any
+  individual may lead. **→** desync uses the same local machinery, inverted.
+
+- **Seeley, T. D., & Visscher, P. K. (2004). "Quorum sensing during nest-site selection by honeybee swarms." *Behav. Ecol. Sociobiol.*** ([Consensus](https://consensus.app/papers/details/e2cb0016ab125e129c88ece2d2f81b09/?utm_source=claude_code)) · **Visscher (2006), *Annu. Rev. Entomol.*** ([Consensus](https://consensus.app/papers/details/9ff07e4f70b0517d95af6bd67ac676d6/?utm_source=claude_code))
+  A quorum threshold triggers the colony's collective commitment, leaderlessly.
+  **→** `brood.swarm`'s quorum circuit-breaker.
+
+- **Reginato, D., et al. (2024). "Bottom-up robust modelling for the foraging behaviour of *Physarum polycephalum*." *J. R. Soc. Interface*.** ([Consensus](https://consensus.app/papers/details/1dec8dc9469857fd9f4e129eb97c2dd2/?utm_source=claude_code))
+  Slime-mold network formation as decentralized, stigmergic multi-agent
+  computation. **→** coordinate through a shared medium, not messages.
+
+- **Bonabeau, E., Dorigo, M., & Theraulaz, G. (1999). *Swarm Intelligence: From Natural to Artificial Systems.* Oxford University Press.** ([OUP](https://global.oup.com/academic/product/swarm-intelligence-9780195131598))
+  The founding synthesis of ACO/PSO and social-insect computation. **→** useful
+  context; the *optimization* branch (searching graphs/spaces) is a weaker fit
+  for timing coordination than the *self-organization* branch.
+
+- **Rubenstein, M., Cornejo, A., & Nagpal, R. (2014). "Programmable self-assembly in a thousand-robot swarm." *Science* 345: 795–799.** ([Science](https://www.science.org/doi/10.1126/science.1254295))
+  A 1024-Kilobot swarm self-assembles with local sensing only, and operations
+  cost the same regardless of swarm size. **→** the scale-invariance
+  `brood.swarm` targets: split a budget across however many workers are live.
+
+- See also **DESYNC** (§2), the direct CS antecedent, and **Mirollo & Strogatz /
+  Kuramoto** (§3) for why synchrony — the failure mode — is the default.
+
+  **→** realized in `brood.swarm` ([swarms.md](swarms.md)): a stigmergic
+  `Medium`, scale-invariant membership, even slotting, and a quorum
+  circuit-breaker.
+
 ---
 
 ## Threads worth pulling
 
 - **Low-discrepancy pacing.** Replace uniform jitter in `brood.ratelimit` with a
   golden-ratio / van der Corput schedule and measure phase coverage (§4).
-- **Adaptive desync.** Add a DESYNC-style feedback loop so independent `brood`
-  clients negotiate phases at runtime, not just by construction (§2).
+- **Adaptive desync — now in `brood.swarm`** (§8): independent clients
+  coordinate phases through a shared medium at runtime, not just by
+  construction. Open refinement: a smoother AIMD for the quorum
+  circuit-breaker instead of the current step.
 - **The harmonic/coprime dial.** Expose a single knob spanning §5's two
   regimes — harmonic for predictability, coprime for contention-avoidance —
   and let the use case choose.

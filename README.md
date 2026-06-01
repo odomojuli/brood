@@ -96,6 +96,7 @@ The full derivation — with a diagram and the precise statements — is in
 | `brood.schedule` | Collision-avoidance scheduler: place a job near a target cadence so it avoids — or maximally rarefies — coincidences, with exact CRT analysis. |
 | `brood.ratelimit` | Rate-limit-safe pacing for an *unknown* limit, the `Pacer` helper, and the analysis tools ([docs/rate-limiting.md](docs/rate-limiting.md)). |
 | `brood.scraper` | `PoliteScraper`: per-host paced, robots-aware, `Retry-After`-respecting HTTP for scrapers ([docs/scraping.md](docs/scraping.md)). |
+| `brood.swarm` | Decentralized coordination for a fleet: a shared rate budget split across live workers, even slotting, and a quorum circuit-breaker ([docs/swarms.md](docs/swarms.md)). |
 | `brood.arrivals` | Poisson process, exponential gaps, and human-like delays (`~274 ms` reaction time). |
 | `brood.tables` | Multiplication tables for checking that a prime modulus generates a cyclic group. |
 
@@ -219,8 +220,9 @@ Or bring your own client (zero extra deps): `scraper.fetch(lambda: httpx.get(url
 - **[docs/rate-limiting.md](docs/rate-limiting.md)** — formalize, apply, and
   *troubleshoot* the desync-for-rate-limits idea, with simulations.
 - **[docs/scraping.md](docs/scraping.md)** — the polite-scraper guide.
+- **[docs/swarms.md](docs/swarms.md)** — decentralized coordination for a fleet of agents.
 - **[docs/literature.md](docs/literature.md)** — annotated bibliography:
-  cicada biology, coprime scheduling, equidistribution, and desync.
+  cicada biology, coprime scheduling, equidistribution, swarms, and desync.
 
 ## Whereof?
 

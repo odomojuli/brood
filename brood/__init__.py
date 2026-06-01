@@ -49,6 +49,7 @@ from .schedule import (
     schedule,
 )
 from .scraper import Disallowed, PoliteScraper
+from .swarm import InMemoryMedium, Medium, Member, Swarm, simulate_desync
 from .tables import format_table, multiplication_table
 from .wheel import coprimes_up_to, plot_wheel, wheel, wheel_circumference
 
@@ -99,6 +100,12 @@ __all__ = [
     "exponential_gaps",
     "poisson_process",
     "human_delays",
+    # swarm
+    "Swarm",
+    "Member",
+    "Medium",
+    "InMemoryMedium",
+    "simulate_desync",
     # tables
     "multiplication_table",
     "format_table",
